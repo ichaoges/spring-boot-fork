@@ -271,11 +271,15 @@ public class SpringApplication {
 	public SpringApplication(ResourceLoader resourceLoader, Class<?>... primarySources) {
 		this.resourceLoader = resourceLoader;
 		Assert.notNull(primarySources, "'primarySources' must not be null");
+		// TODO learn : 设置启动的主类
 		this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
+		// TODO learn : 从类路径上推断出本次启动的应用类型
 		this.properties.setWebApplicationType(WebApplicationType.deduceFromClasspath());
 		this.bootstrapRegistryInitializers = new ArrayList<>(
 				getSpringFactoriesInstances(BootstrapRegistryInitializer.class));
+		// TODO learn : 从 spring.factories 中获取设置的 ApplicationContextInitializer
 		setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
+		// TODO learn : 从 spring.factories 中获取设置的 ApplicationListener
 		setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
 		this.mainApplicationClass = deduceMainApplicationClass();
 	}
@@ -301,34 +305,50 @@ public class SpringApplication {
 	public ConfigurableApplicationContext run(String... args) {
 		Startup startup = Startup.create();
 		if (this.properties.isRegisterShutdownHook()) {
+			// TODO learn : 如果允许注册 hook，则将 shutdownHook 设置为允许
 			SpringApplication.shutdownHook.enableShutdownHookAddition();
 		}
+		// TODO learn : 创建一个引导上下文
 		DefaultBootstrapContext bootstrapContext = createBootstrapContext();
 		ConfigurableApplicationContext context = null;
 		configureHeadlessProperty();
+		// TODO learn : 获取应用启动的监听器
 		SpringApplicationRunListeners listeners = getRunListeners(args);
+		// TODO learn : 触发 应用启动中 的应用启动事件
 		listeners.starting(bootstrapContext, this.mainApplicationClass);
 		try {
+			// TODO learn : 将启动参数解析包装为对象，会对参数进行解析，例如 --flag=value
 			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+			// TODO learn : 准备环境
 			ConfigurableEnvironment environment = prepareEnvironment(listeners, bootstrapContext, applicationArguments);
+			// TODO learn : 打印 banner 图。可以配置成打印到 log中
 			Banner printedBanner = printBanner(environment);
+			// TODO learn : 根据应用类型创建上下文对象
 			context = createApplicationContext();
+			// TODO learn : 将启动类的启动记录器 挂到上下文对象上
 			context.setApplicationStartup(this.applicationStartup);
+			// TODO learn : 准备上下文（重要）
 			prepareContext(bootstrapContext, context, environment, listeners, applicationArguments, printedBanner);
+			// TODO learn : 上下文刷新（核心）
 			refreshContext(context);
+			// TODO learn : 上下文刷新后置操作，默认没有操作，由子类实现
 			afterRefresh(context, applicationArguments);
 			startup.started();
 			if (this.properties.isLogStartupInfo()) {
 				new StartupInfoLogger(this.mainApplicationClass, environment).logStarted(getApplicationLog(), startup);
 			}
+			// TODO learn : 触发 应用已启动 的应用启动事件
 			listeners.started(context, startup.timeTakenToStarted());
+			// TODO learn : 调用所有的 ApplicationRunner 和 CommandLineRunner  （扩展点）
 			callRunners(context, applicationArguments);
 		}
 		catch (Throwable ex) {
+			// TODO learn : 启动失败处理，会有友好的日志和提示
 			throw handleRunFailure(context, ex, listeners);
 		}
 		try {
 			if (context.isRunning()) {
+				// TODO learn : 触发 应用已准备 的应用启动事件
 				listeners.ready(context, startup.ready());
 			}
 		}
@@ -340,6 +360,7 @@ public class SpringApplication {
 
 	private DefaultBootstrapContext createBootstrapContext() {
 		DefaultBootstrapContext bootstrapContext = new DefaultBootstrapContext();
+		// TODO learn : 执行注册好的 BootstrapRegistryInitializer （扩展点）
 		this.bootstrapRegistryInitializers.forEach((initializer) -> initializer.initialize(bootstrapContext));
 		return bootstrapContext;
 	}
@@ -347,14 +368,18 @@ public class SpringApplication {
 	private ConfigurableEnvironment prepareEnvironment(SpringApplicationRunListeners listeners,
 			DefaultBootstrapContext bootstrapContext, ApplicationArguments applicationArguments) {
 		// Create and configure the environment
+		// TODO learn : 创建一个环境对象
 		ConfigurableEnvironment environment = getOrCreateEnvironment();
+		// TODO learn : 根据启动参数对环境进行配置，所以我们在启动时通过参数修改环境
 		configureEnvironment(environment, applicationArguments.getSourceArgs());
 		ConfigurationPropertySources.attach(environment);
+		// TODO learn : 触发 环境已准备 的应用启动事件
 		listeners.environmentPrepared(bootstrapContext, environment);
 		ApplicationInfoPropertySource.moveToEnd(environment);
 		DefaultPropertiesPropertySource.moveToEnd(environment);
 		Assert.state(!environment.containsProperty("spring.main.environment-prefix"),
 				"Environment prefix cannot be set via properties.");
+		// TODO learn : 环境与应用启动类绑定
 		bindToSpringApplication(environment);
 		if (!this.isCustomEnvironment) {
 			EnvironmentConverter environmentConverter = new EnvironmentConverter(getClassLoader());
@@ -377,11 +402,16 @@ public class SpringApplication {
 	private void prepareContext(DefaultBootstrapContext bootstrapContext, ConfigurableApplicationContext context,
 			ConfigurableEnvironment environment, SpringApplicationRunListeners listeners,
 			ApplicationArguments applicationArguments, Banner printedBanner) {
+		// TODO learn : 环境对象 挂到上下文上
 		context.setEnvironment(environment);
 		postProcessApplicationContext(context);
+		// TODO learn : 尝试将 Initializers 换成AOT优化后的
 		addAotGeneratedInitializerIfNecessary(this.initializers);
+		// TODO learn : 执行注册好的 ApplicationContextInitializer （扩展点）
 		applyInitializers(context);
+		// TODO learn : 触发 上下文已准备 的应用启动事件
 		listeners.contextPrepared(context);
+		// TODO learn : 将引导上下文关闭，关闭的时候触发 BootstrapContextClosedEvent 事件
 		bootstrapContext.close(context);
 		if (this.properties.isLogStartupInfo()) {
 			logStartupInfo(context.getParent() == null);
@@ -390,20 +420,26 @@ public class SpringApplication {
 		}
 		// Add boot specific singleton beans
 		ConfigurableListableBeanFactory beanFactory = context.getBeanFactory();
+		// TODO learn : 将启动参数包装类 注册单例到 BeanFactory
 		beanFactory.registerSingleton("springApplicationArguments", applicationArguments);
 		if (printedBanner != null) {
+			// TODO learn : 将Banner对象 注册单例到 BeanFactory
 			beanFactory.registerSingleton("springBootBanner", printedBanner);
 		}
 		if (beanFactory instanceof AbstractAutowireCapableBeanFactory autowireCapableBeanFactory) {
+			// TODO learn : 给 beanFactory 设置是否支持循环依赖
 			autowireCapableBeanFactory.setAllowCircularReferences(this.properties.isAllowCircularReferences());
 			if (beanFactory instanceof DefaultListableBeanFactory listableBeanFactory) {
+				// TODO learn : 给 beanFactory 设置是否支持 bean 重复定义
 				listableBeanFactory.setAllowBeanDefinitionOverriding(this.properties.isAllowBeanDefinitionOverriding());
 			}
 		}
 		if (this.properties.isLazyInitialization()) {
+			// TODO learn : 如果支持懒初始化，在这里注册 LazyInitializationBeanFactoryPostProcessor
 			context.addBeanFactoryPostProcessor(new LazyInitializationBeanFactoryPostProcessor());
 		}
 		if (this.properties.isKeepAlive()) {
+			// TODO learn : 如果支持保活，则将 KeepAlive 添加到上下文的事件监听中。它会一直运行以保持jvm一直处于活动状态，直到收到上下文关闭事件
 			context.addApplicationListener(new KeepAlive());
 		}
 		context.addBeanFactoryPostProcessor(new PropertySourceOrderingBeanFactoryPostProcessor(context));
@@ -413,6 +449,7 @@ public class SpringApplication {
 			Assert.state(!ObjectUtils.isEmpty(sources), "No sources defined");
 			load(context, sources.toArray(new Object[0]));
 		}
+		// TODO learn : 触发 上下文已加载 的应用启动事件
 		listeners.contextLoaded(context);
 	}
 
@@ -447,9 +484,11 @@ public class SpringApplication {
 	private SpringApplicationRunListeners getRunListeners(String[] args) {
 		ArgumentResolver argumentResolver = ArgumentResolver.of(SpringApplication.class, this);
 		argumentResolver = argumentResolver.and(String[].class, args);
+		// TODO learn : 从 spring.factories 中获取注册的 SpringApplicationRunListener
 		List<SpringApplicationRunListener> listeners = getSpringFactoriesInstances(SpringApplicationRunListener.class,
 				argumentResolver);
 		SpringApplicationHook hook = applicationHook.get();
+		// TODO learn : 尝试从 应用Hook 中获取 SpringApplicationRunListener
 		SpringApplicationRunListener hookListener = (hook != null) ? hook.getRunListener(this) : null;
 		if (hookListener != null) {
 			listeners = new ArrayList<>(listeners);
@@ -462,6 +501,7 @@ public class SpringApplication {
 		return getSpringFactoriesInstances(type, null);
 	}
 
+	// TODO learn : 从 spring.factories 文件中获取配置的Bean
 	private <T> List<T> getSpringFactoriesInstances(Class<T> type, ArgumentResolver argumentResolver) {
 		return SpringFactoriesLoader.forDefaultResourceLocation(getClassLoader()).load(type, argumentResolver);
 	}
@@ -809,6 +849,7 @@ public class SpringApplication {
 				}
 			}
 			finally {
+				// TODO learn : 从 spring.factories 中找到 SpringBootExceptionReporter 并生成对应的报告内容，报告出来
 				reportFailure(getExceptionReporters(context), exception);
 				if (context != null) {
 					context.close();
