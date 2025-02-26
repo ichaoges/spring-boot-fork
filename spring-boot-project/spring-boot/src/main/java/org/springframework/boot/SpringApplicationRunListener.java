@@ -36,6 +36,7 @@ import org.springframework.core.io.support.SpringFactoriesLoader;
  * @author Chris Bono
  * @since 1.0.0
  */
+// TODO learn : 应用启动监听器，可以实现它来监听应用启动过程中的一些事件。可以监听到的事件可以看这个类的方法，一个方法就是一个事件
 public interface SpringApplicationRunListener {
 
 	/**
