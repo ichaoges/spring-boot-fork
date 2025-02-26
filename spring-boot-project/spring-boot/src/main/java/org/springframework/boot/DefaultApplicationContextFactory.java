@@ -41,6 +41,7 @@ class DefaultApplicationContextFactory implements ApplicationContextFactory {
 
 	@Override
 	public ConfigurableEnvironment createEnvironment(WebApplicationType webApplicationType) {
+		// TODO learn : 尝试从 spring.factories 中获取 ApplicationContextFactory 并用它创建 Environment
 		return getFromSpringFactories(webApplicationType, ApplicationContextFactory::createEnvironment, null);
 	}
 

@@ -271,7 +271,7 @@ public class SpringApplication {
 	public SpringApplication(ResourceLoader resourceLoader, Class<?>... primarySources) {
 		this.resourceLoader = resourceLoader;
 		Assert.notNull(primarySources, "PrimarySources must not be null");
-		// TODO learn : 设置启动的主类
+		// TODO learn : 设置主要的 bean，表示从那个类开始不断找 bean。业务上通常为启动类。这里做了去重
 		this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
 		// TODO learn : 从 classpath 上是否有某些特定的类，来判断本次启动的应用类型
 		this.properties.setWebApplicationType(WebApplicationType.deduceFromClasspath());
@@ -282,6 +282,7 @@ public class SpringApplication {
 		setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
 		// TODO learn : 从 spring.factories 中获取设置的 ApplicationListener 的实例 （扩展点）
 		setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
+		// TODO learn : 通过调用栈找到应用启动类
 		this.mainApplicationClass = deduceMainApplicationClass();
 	}
 
@@ -304,29 +305,31 @@ public class SpringApplication {
 	 * @return a running {@link ApplicationContext}
 	 */
 	public ConfigurableApplicationContext run(String... args) {
+		// TODO learn : 创建一个启动记录器，方便记录时间
 		Startup startup = Startup.create();
 		if (this.properties.isRegisterShutdownHook()) {
 			// TODO learn : 如果允许注册 hook，则将 shutdownHook 设置为允许
 			SpringApplication.shutdownHook.enableShutdownHookAddition();
 		}
-		// TODO learn : 创建一个引导上下文，同时执行在该类的构造器中获取到的 BootstrapRegistryInitializer
+		// TODO learn : 创建一个引导上下文，同时执行在该类的构造器中获取到的 BootstrapRegistryInitializer （扩展点执行位置）
 		DefaultBootstrapContext bootstrapContext = createBootstrapContext();
 		ConfigurableApplicationContext context = null;
+		// TODO learn : 确保 Spring Boot 应用程序在运行时正确地配置了 "headless" 模式（非 GUI 模式）。避免在没有 GUI 环境的情况下运行时出现问题，通常服务端程序不会运行在 GUI 环境中。
 		configureHeadlessProperty();
-		// TODO learn : 获取应用启动的监听器
+		// TODO learn : 获取一个应用启动的监听器组，这些监听器会在对应的事件触发位置被执行，可以参照 SpringApplicationRunListener 中的方法（扩展点）
 		SpringApplicationRunListeners listeners = getRunListeners(args);
-		// TODO learn : 触发 应用启动中 的应用启动事件
+		// TODO learn : 触发应用启动监听器组中的应用启动事件
 		listeners.starting(bootstrapContext, this.mainApplicationClass);
 		try {
 			// TODO learn : 将启动参数解析包装为对象，会对参数进行解析，例如 --flag=value
 			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
-			// TODO learn : 准备环境
+			// TODO learn : 准备环境，里面会处理一系列的属性参数，所以可以从 Environment 获取属性
 			ConfigurableEnvironment environment = prepareEnvironment(listeners, bootstrapContext, applicationArguments);
 			// TODO learn : 打印 banner 图。可以配置成打印到 log中
 			Banner printedBanner = printBanner(environment);
 			// TODO learn : 根据应用类型创建上下文对象
 			context = createApplicationContext();
-			// TODO learn : 将启动类的启动记录器 挂到上下文对象上
+			// TODO learn : 将应用启动记录器设置到上下文对象
 			context.setApplicationStartup(this.applicationStartup);
 			// TODO learn : 准备上下文（重要）
 			prepareContext(bootstrapContext, context, environment, listeners, applicationArguments, printedBanner);
@@ -374,9 +377,11 @@ public class SpringApplication {
 		// TODO learn : 根据启动参数对环境进行配置，所以我们在启动时通过参数修改环境
 		configureEnvironment(environment, applicationArguments.getSourceArgs());
 		ConfigurationPropertySources.attach(environment);
-		// TODO learn : 触发 环境已准备 的应用启动事件
+		// TODO learn :（重点）触发 环境已准备 的应用启动事件。这里下有有很多环境准备完成的监听器，会处理很多加载属性配置的工作，比如 Yaml 配置文件的解析等，在 EnvironmentPostProcessorApplicationListener 中（扩展点）
 		listeners.environmentPrepared(bootstrapContext, environment);
+		// TODO learn : 将 ApplicationInfoPropertySource 属性源添加环境的最后
 		ApplicationInfoPropertySource.moveToEnd(environment);
+		// TODO learn : 将 DefaultPropertiesPropertySource 属性源添加环境的最后
 		DefaultPropertiesPropertySource.moveToEnd(environment);
 		Assert.state(!environment.containsProperty("spring.main.environment-prefix"),
 				"Environment prefix cannot be set via properties.");
@@ -483,6 +488,7 @@ public class SpringApplication {
 	}
 
 	private SpringApplicationRunListeners getRunListeners(String[] args) {
+		// TODO learn : ArgumentResolver 是参数解析器，用来解析参数
 		ArgumentResolver argumentResolver = ArgumentResolver.of(SpringApplication.class, this);
 		argumentResolver = argumentResolver.and(String[].class, args);
 		// TODO learn : 从 spring.factories 中获取注册的 SpringApplicationRunListener
@@ -503,7 +509,7 @@ public class SpringApplication {
 		return getSpringFactoriesInstances(type, null);
 	}
 
-	// TODO learn : 尝试从 spring.factories 文件中获取配置的 Bean
+	// TODO learn : 尝试从 spring.factories 文件 或者 参数解析器 中获取配置的 Bean
 	private <T> List<T> getSpringFactoriesInstances(Class<T> type, ArgumentResolver argumentResolver) {
 		return SpringFactoriesLoader.forDefaultResourceLocation(getClassLoader()).load(type, argumentResolver);
 	}
@@ -512,11 +518,14 @@ public class SpringApplication {
 		if (this.environment != null) {
 			return this.environment;
 		}
+		// TODO learn : 应用类型，在构造器中判断出来的
 		WebApplicationType webApplicationType = this.properties.getWebApplicationType();
+		// TODO learn : 根据应用类型创建一个环境。
 		ConfigurableEnvironment environment = this.applicationContextFactory.createEnvironment(webApplicationType);
 		if (environment == null && this.applicationContextFactory != ApplicationContextFactory.DEFAULT) {
 			environment = ApplicationContextFactory.DEFAULT.createEnvironment(webApplicationType);
 		}
+		// TODO learn : 如果上面的方式都没创建成功过，就 new 一个 ApplicationEnvironment
 		return (environment != null) ? environment : new ApplicationEnvironment();
 	}
 
@@ -535,7 +544,9 @@ public class SpringApplication {
 		if (this.addConversionService) {
 			environment.setConversionService(new ApplicationConversionService());
 		}
+		// TODO learn : 配置属性源
 		configurePropertySources(environment, args);
+		// TODO learn : 配置应用的活动环境
 		configureProfiles(environment, args);
 	}
 
@@ -546,6 +557,7 @@ public class SpringApplication {
 	 * @param args arguments passed to the {@code run} method
 	 * @see #configureEnvironment(ConfigurableEnvironment, String[])
 	 */
+	// TODO learn : 配置属性源
 	protected void configurePropertySources(ConfigurableEnvironment environment, String[] args) {
 		MutablePropertySources sources = environment.getPropertySources();
 		if (!CollectionUtils.isEmpty(this.defaultProperties)) {
@@ -554,6 +566,7 @@ public class SpringApplication {
 		if (this.addCommandLineProperties && args.length > 0) {
 			String name = CommandLinePropertySource.COMMAND_LINE_PROPERTY_SOURCE_NAME;
 			if (sources.contains(name)) {
+				// TODO learn : 如果环境属性源组中已经有了 commandLineArg 源，则将参数合并进来
 				PropertySource<?> source = sources.get(name);
 				CompositePropertySource composite = new CompositePropertySource(name);
 				composite
@@ -562,9 +575,11 @@ public class SpringApplication {
 				sources.replace(name, composite);
 			}
 			else {
+				// TODO learn : 将参数包装成属性源，并添加到环境属性源组中
 				sources.addFirst(new SimpleCommandLinePropertySource(args));
 			}
 		}
+		// TODO learn : 解析应用主类作为属性源添加到环境属性源组中
 		environment.getPropertySources().addLast(new ApplicationInfoPropertySource(this.mainApplicationClass));
 	}
 
