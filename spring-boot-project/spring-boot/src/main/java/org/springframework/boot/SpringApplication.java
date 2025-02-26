@@ -273,13 +273,14 @@ public class SpringApplication {
 		Assert.notNull(primarySources, "'primarySources' must not be null");
 		// TODO learn : 设置启动的主类
 		this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
-		// TODO learn : 从类路径上推断出本次启动的应用类型
+		// TODO learn : 从 classpath 上是否有某些特定的类，来判断本次启动的应用类型
 		this.properties.setWebApplicationType(WebApplicationType.deduceFromClasspath());
+		// TODO learn : 从 spring.factories 中获取 BootstrapRegistryInitializer 的实例（扩展点）
 		this.bootstrapRegistryInitializers = new ArrayList<>(
 				getSpringFactoriesInstances(BootstrapRegistryInitializer.class));
-		// TODO learn : 从 spring.factories 中获取设置的 ApplicationContextInitializer
+		// TODO learn : 从 spring.factories 中获取设置的 ApplicationContextInitializer 的实例（扩展点）
 		setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
-		// TODO learn : 从 spring.factories 中获取设置的 ApplicationListener
+		// TODO learn : 从 spring.factories 中获取设置的 ApplicationListener 的实例 （扩展点）
 		setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
 		this.mainApplicationClass = deduceMainApplicationClass();
 	}
@@ -308,7 +309,7 @@ public class SpringApplication {
 			// TODO learn : 如果允许注册 hook，则将 shutdownHook 设置为允许
 			SpringApplication.shutdownHook.enableShutdownHookAddition();
 		}
-		// TODO learn : 创建一个引导上下文
+		// TODO learn : 创建一个引导上下文，同时执行在该类的构造器中获取到的 BootstrapRegistryInitializer
 		DefaultBootstrapContext bootstrapContext = createBootstrapContext();
 		ConfigurableApplicationContext context = null;
 		configureHeadlessProperty();
@@ -497,11 +498,12 @@ public class SpringApplication {
 		return new SpringApplicationRunListeners(logger, listeners, this.applicationStartup);
 	}
 
+	// TODO learn : 尝试从 spring.factories 文件中获取配置的 Bean
 	private <T> List<T> getSpringFactoriesInstances(Class<T> type) {
 		return getSpringFactoriesInstances(type, null);
 	}
 
-	// TODO learn : 从 spring.factories 文件中获取配置的Bean
+	// TODO learn : 尝试从 spring.factories 文件中获取配置的 Bean
 	private <T> List<T> getSpringFactoriesInstances(Class<T> type, ArgumentResolver argumentResolver) {
 		return SpringFactoriesLoader.forDefaultResourceLocation(getClassLoader()).load(type, argumentResolver);
 	}
