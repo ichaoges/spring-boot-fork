@@ -48,6 +48,7 @@ class DefaultApplicationContextFactory implements ApplicationContextFactory {
 	@Override
 	public ConfigurableApplicationContext create(WebApplicationType webApplicationType) {
 		try {
+			// TODO learn : 尝试从 spring.factories 的定义中找到 ApplicationContextFactory 并创建，否则走 default。默认都会走到 default
 			return getFromSpringFactories(webApplicationType, ApplicationContextFactory::create,
 					this::createDefaultApplicationContext);
 		}
@@ -57,6 +58,7 @@ class DefaultApplicationContextFactory implements ApplicationContextFactory {
 		}
 	}
 
+	// TODO learn : 通常都会走到这个方法，来创建 ApplicationContext
 	private ConfigurableApplicationContext createDefaultApplicationContext() {
 		if (!AotDetector.useGeneratedArtifacts()) {
 			return new AnnotationConfigApplicationContext();

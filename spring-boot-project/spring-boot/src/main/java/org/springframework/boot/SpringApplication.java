@@ -335,10 +335,12 @@ public class SpringApplication {
 			prepareContext(bootstrapContext, context, environment, listeners, applicationArguments, printedBanner);
 			// TODO learn : 上下文刷新（核心）
 			refreshContext(context);
-			// TODO learn : 上下文刷新后置操作，默认没有操作，由子类实现
+			// TODO learn : 上下文刷新后置操作（默认没有操作，由子类实现）
 			afterRefresh(context, applicationArguments);
+			// TODO learn : 记录启动完成
 			startup.started();
 			if (this.properties.isLogStartupInfo()) {
+				// TODO learn : 如果开启了打印启动信息 log，则打印启动完成信息。就是那个应用在xx秒启动成功。这个时候这个 startup 中的信息就派上用场了。
 				new StartupInfoLogger(this.mainApplicationClass, environment).logStarted(getApplicationLog(), startup);
 			}
 			// TODO learn : 触发 应用已启动 的应用启动事件
@@ -347,7 +349,7 @@ public class SpringApplication {
 			callRunners(context, applicationArguments);
 		}
 		catch (Throwable ex) {
-			// TODO learn : 启动失败处理，会有友好的日志和提示
+			// TODO learn : 启动失败的处理（那个看起来很友好的失败提示就是在这里面打印的）
 			throw handleRunFailure(context, ex, listeners);
 		}
 		try {
@@ -357,6 +359,7 @@ public class SpringApplication {
 			}
 		}
 		catch (Throwable ex) {
+			// TODO learn : 如果在处理 ready 事件过程中出现异常，也一样按照启动失败处理。只是这个时候就不再传递 listeners 了，也就不再触发应用启动失败事件了。
 			throw handleRunFailure(context, ex, null);
 		}
 		return context;
@@ -408,17 +411,19 @@ public class SpringApplication {
 	private void prepareContext(DefaultBootstrapContext bootstrapContext, ConfigurableApplicationContext context,
 			ConfigurableEnvironment environment, SpringApplicationRunListeners listeners,
 			ApplicationArguments applicationArguments, Banner printedBanner) {
-		// TODO learn : 环境对象 挂到上下文上
+		// TODO learn : environment 设置到 context 中，下一步方法中会用到这个 environment
 		context.setEnvironment(environment);
+		// TODO learn : 进一步处理 context，详见方法细节
 		postProcessApplicationContext(context);
-		// TODO learn : 尝试将 Initializers 换成AOT优化后的
+		// TODO learn : 如果开启 AOT，则对 Initializers 进行调整和补充，详见方法细节
 		addAotGeneratedInitializerIfNecessary(this.initializers);
-		// TODO learn : 执行注册好的 ApplicationContextInitializer （扩展点）
+		// TODO learn : 执行 ApplicationContextInitializer （扩展点）
 		applyInitializers(context);
 		// TODO learn : 触发 上下文已准备 的应用启动事件
 		listeners.contextPrepared(context);
-		// TODO learn : 将引导上下文关闭，关闭的时候触发 BootstrapContextClosedEvent 事件
+		// TODO learn : 触发 BootstrapContextClosedEvent 事件
 		bootstrapContext.close(context);
+		// TODO learn : 是否打印启动 log？如果是，则打印应用启动信息。注意这个和 banner 不是同一个东西
 		if (this.properties.isLogStartupInfo()) {
 			logStartupInfo(context.getParent() == null);
 			logStartupInfo(context);
@@ -426,17 +431,19 @@ public class SpringApplication {
 		}
 		// Add boot specific singleton beans
 		ConfigurableListableBeanFactory beanFactory = context.getBeanFactory();
-		// TODO learn : 将启动参数包装类 注册单例到 BeanFactory
+		// TODO learn : 将应用启动参数包装类注册单例到 BeanFactory
 		beanFactory.registerSingleton("springApplicationArguments", applicationArguments);
 		if (printedBanner != null) {
-			// TODO learn : 将Banner对象 注册单例到 BeanFactory
+			// TODO learn : 将 Banner对象 注册单例到 BeanFactory
 			beanFactory.registerSingleton("springBootBanner", printedBanner);
 		}
+		// TODO learn : 如果 beanFactory 是支持自动注入的。
 		if (beanFactory instanceof AbstractAutowireCapableBeanFactory autowireCapableBeanFactory) {
 			// TODO learn : 给 beanFactory 设置是否支持循环依赖
 			autowireCapableBeanFactory.setAllowCircularReferences(this.properties.isAllowCircularReferences());
+			// TODO learn : 如果 beanFactory 是支持列表化 bean 的，即支持根据类型获取一组 bean 的功能
 			if (beanFactory instanceof DefaultListableBeanFactory listableBeanFactory) {
-				// TODO learn : 给 beanFactory 设置是否支持 bean 重复定义
+				// TODO learn : 给 beanFactory 设置是否支持 bean 重复定义。（如果重复定义了，通常是后面的覆盖前面的）
 				listableBeanFactory.setAllowBeanDefinitionOverriding(this.properties.isAllowBeanDefinitionOverriding());
 			}
 		}
@@ -448,6 +455,7 @@ public class SpringApplication {
 			// TODO learn : 如果支持保活，则将 KeepAlive 添加到上下文的事件监听中。它会一直运行以保持jvm一直处于活动状态，直到收到上下文关闭事件
 			context.addApplicationListener(new KeepAlive());
 		}
+		// TODO learn : 注册 PropertySourceOrderingBeanFactoryPostProcessor，它可以确保 DefaultPropertiesPropertySource 一直处于属性源组的最后。
 		context.addBeanFactoryPostProcessor(new PropertySourceOrderingBeanFactoryPostProcessor(context));
 		if (!AotDetector.useGeneratedArtifacts()) {
 			// Load the sources
@@ -476,9 +484,11 @@ public class SpringApplication {
 	}
 
 	private void refreshContext(ConfigurableApplicationContext context) {
+		// TODO learn : 如果开启 shutdown hook 注册
 		if (this.properties.isRegisterShutdownHook()) {
 			shutdownHook.registerApplicationContext(context);
 		}
+		// TODO learn : 开始 refresh context。重点，详情请参照 spring framework 源码。
 		refresh(context);
 	}
 
@@ -637,10 +647,12 @@ public class SpringApplication {
 	 * @param context the application context
 	 */
 	protected void postProcessApplicationContext(ConfigurableApplicationContext context) {
+		// TODO learn : 如果设置了 beanNameGenerator，就把它注册到 beanFactory 中
 		if (this.beanNameGenerator != null) {
 			context.getBeanFactory()
 				.registerSingleton(AnnotationConfigUtils.CONFIGURATION_BEAN_NAME_GENERATOR, this.beanNameGenerator);
 		}
+		// TODO learn : 如果设置了 resourceLoader，则将它设置到 context 中
 		if (this.resourceLoader != null) {
 			if (context instanceof GenericApplicationContext genericApplicationContext) {
 				genericApplicationContext.setResourceLoader(this.resourceLoader);
@@ -819,13 +831,16 @@ public class SpringApplication {
 
 	private void callRunners(ConfigurableApplicationContext context, ApplicationArguments args) {
 		ConfigurableListableBeanFactory beanFactory = context.getBeanFactory();
+		// TODO learn : 从 beanFactory 中获取所有的 Runner
 		String[] beanNames = beanFactory.getBeanNamesForType(Runner.class);
+		// TODO learn : 将所有 runner bean 转成 bean: name 的 map
 		Map<Runner, String> instancesToBeanNames = new IdentityHashMap<>();
 		for (String beanName : beanNames) {
 			instancesToBeanNames.put(beanFactory.getBean(beanName, Runner.class), beanName);
 		}
 		Comparator<Object> comparator = getOrderComparator(beanFactory)
 			.withSourceProvider(new FactoryAwareOrderSourceProvider(beanFactory, instancesToBeanNames));
+		// TODO learn : 将 runner bean 排序，然后调 callRunner
 		instancesToBeanNames.keySet().stream().sorted(comparator).forEach((runner) -> callRunner(runner, args));
 	}
 
@@ -837,6 +852,7 @@ public class SpringApplication {
 	}
 
 	private void callRunner(Runner runner, ApplicationArguments args) {
+		// TODO learn : 仅执行 ApplicationRunner 和 CommandLineRunner
 		if (runner instanceof ApplicationRunner) {
 			callRunner(ApplicationRunner.class, runner, (applicationRunner) -> applicationRunner.run(args));
 		}
@@ -856,12 +872,15 @@ public class SpringApplication {
 	private RuntimeException handleRunFailure(ConfigurableApplicationContext context, Throwable exception,
 			SpringApplicationRunListeners listeners) {
 		if (exception instanceof AbandonedRunException abandonedRunException) {
+			// TODO learn : AbandonedRunException 不需要处理，直接返回就好。
 			return abandonedRunException;
 		}
 		try {
 			try {
+				// TODO learn : 尝试处理 exit code
 				handleExitCode(context, exception);
 				if (listeners != null) {
+					// TODO learn : 触发 应用启动失败 事件
 					listeners.failed(context, exception);
 				}
 			}
@@ -875,8 +894,10 @@ public class SpringApplication {
 			}
 		}
 		catch (Exception ex) {
+			// TODO learn : 处理失败的过程如果再异常，就打个 log 算了。
 			logger.warn("Unable to close ApplicationContext", ex);
 		}
+		/// TODO learn : 这里相当于将非 RuntimeException 包装成了 RuntimeException 类型的异常
 		return (exception instanceof RuntimeException runtimeException) ? runtimeException
 				: new IllegalStateException(exception);
 	}
@@ -1745,6 +1766,7 @@ public class SpringApplication {
 			Thread thread = new Thread(() -> {
 				while (true) {
 					try {
+						// TODO learn : 一直 sleep ？！
 						Thread.sleep(Long.MAX_VALUE);
 					}
 					catch (InterruptedException ex) {
